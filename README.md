@@ -1,5 +1,7 @@
 # Structured-storytelling-project
 
+Through conceptual storytelling, the plot and characters are created by working backward from the story's ending to establish the underlying premises.
+
 This repository is for designing a structured storytelling workflow that:
 
 1. reverse-engineers a story from ending conditions back to its earliest premises,
