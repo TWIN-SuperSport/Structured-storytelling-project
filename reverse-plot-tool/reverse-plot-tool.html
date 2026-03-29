@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>reverse-plot-tool</title>
+  <style>
+    :root {
+      --bg: #f2ede4;
+      --paper: #fffaf2;
+      --ink: #1d1a16;
+      --muted: #6c6256;
+      --line: #d8c8b1;
+      --accent: #8f4d2e;
+      --accent-2: #c98f54;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(201,143,84,0.22), transparent 38%),
+        linear-gradient(180deg, #f6f1e8, var(--bg));
+      color: var(--ink);
+      font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
+    }
+    .wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 28px 18px 48px;
+    }
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(2rem, 5vw, 3.4rem);
+      letter-spacing: 0.04em;
+    }
+    .lead {
+      margin: 0 0 22px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 18px;
+    }
+    .panel {
+      background: rgba(255,250,242,0.88);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 12px 30px rgba(61, 40, 18, 0.08);
+    }
+    label {
+      display: block;
+      margin: 0 0 8px;
+      font-size: 0.95rem;
+    }
+    textarea, input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font: inherit;
+      background: #fffdfa;
+      color: var(--ink);
+    }
+    textarea {
+      min-height: 180px;
+      resize: vertical;
+      line-height: 1.7;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 12px;
+    }
+    button {
+      margin-top: 14px;
+      border: none;
+      border-radius: 999px;
+      padding: 12px 20px;
+      font: inherit;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: white;
+      cursor: pointer;
+    }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.7;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.9rem;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.7;
+    }
+    @media (max-width: 800px) {
+      .grid { grid-template-columns: 1fr; }
+      .row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>reverse-plot-tool</h1>
+    <p class="lead">結末や終着条件から、物語の前提・欠落・関係変化・転換点を遡上して構造化するための検証サービス。</p>
+    <div class="grid">
+      <section class="panel">
+        <label for="ending_text">終着条件 / 結末</label>
+        <textarea id="ending_text">現代日本から異世界に転生した高校生の男子が、異世界で魔法使いとして成長し、魔王を討伐したあと、日本に再転生して終わる。</textarea>
+        <div class="row">
+          <div>
+            <label for="genre_hint">ジャンルヒント</label>
+            <input id="genre_hint" value="異世界転生ファンタジー">
+          </div>
+          <div>
+            <label for="protagonist_hint">主人公ヒント</label>
+            <input id="protagonist_hint" value="男子高校生">
+          </div>
+        </div>
+        <button id="run-btn" type="button">物語構造を遡上する</button>
+      </section>
+      <section class="panel">
+        <p class="hint">いまは JSON をそのまま表示する。最終的にはこの正本から `.md` のプロットを起こす想定。</p>
+        <pre id="output">ここに結果が出る。</pre>
+      </section>
+    </div>
+  </div>
+  <script>
+    const btn = document.getElementById('run-btn');
+    const output = document.getElementById('output');
+    btn.addEventListener('click', async () => {
+      output.textContent = '考え中...';
+      try {
+        const res = await fetch('/api/story/reverse-plot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ending_text: document.getElementById('ending_text').value,
+            genre_hint: document.getElementById('genre_hint').value,
+            protagonist_hint: document.getElementById('protagonist_hint').value
+          })
+        });
+        const data = await res.json();
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        output.textContent = String(e);
+      }
+    });
+  </script>
+</body>
+</html>

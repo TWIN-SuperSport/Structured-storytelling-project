@@ -1,0 +1,43 @@
+name: Deploy reverse-plot-tool
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.KTSYS_LAB_SSH_KEY }}
+
+      - name: Trust host
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.KTSYS_LAB_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy on ktsys-lab
+        run: |
+          ssh -p 22 "${{ secrets.KTSYS_LAB_USER }}@${{ secrets.KTSYS_LAB_HOST }}" '
+            set -e
+            cd /home/shino/work/upstream/Structured-storytelling-project
+            git fetch git@github.com:TWIN-SuperSport/Structured-storytelling-project.git main
+            if git show-ref --verify --quiet refs/heads/main; then
+              git checkout main
+            else
+              git checkout -b main
+            fi
+            git reset --hard FETCH_HEAD
+            cd reverse-plot-tool
+            docker compose down --remove-orphans || true
+            docker compose up -d --build
+          '

@@ -1,0 +1,9 @@
+{
+  "name": "ssnshino/reverse-plot-tool",
+  "type": "project",
+  "require": {
+    "php": "^8.4",
+    "slim/slim": "^4.14",
+    "slim/psr7": "^1.7"
+  }
+}
