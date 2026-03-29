@@ -1,17 +1,16 @@
 name: Deploy reverse-plot-tool
 
 on:
-  push:
+  pull_request:
     branches:
       - main
-    paths:
-      - "reverse-plot-tool/**"
-      - ".github/workflows/deploy-reverse-plot-tool.yml"
-      - "README.md"
+    types:
+      - closed
   workflow_dispatch:
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
