@@ -24,6 +24,7 @@ Structured-storytelling-project 配下で、結末から物語構造を遡上す
 - `POST /api/story/reverse-plot` を仮実装
 - UI は最小の検証用フォーム
 - 現在は `Swallow-8B` 経由の品質優先試験運用
+- `突拍子レベル` (`0`〜`10`) で、展開の跳ね方を指定できる
 
 ## 現行の LLM 経路
 

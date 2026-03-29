@@ -9,6 +9,7 @@
 - `ending_text`
 - `protagonist_hint` (任意)
 - `genre_hint` (任意)
+- `wild_twist_level` (0〜10, 任意, 既定値 0)
 
 ## 出力
 
@@ -27,3 +28,4 @@
 - この JSON を正本とする
 - 後段で `.md` プロットへ投影できるようにする
 - さらに断片ツールへ接続できるようにする
+- `wild_twist_level` に応じて、とくに `required_turning_points` と `plot.ten` の跳ね方を調整できるようにする
