@@ -3,7 +3,7 @@ name: Deploy reverse-plot-tool
 on:
   push:
     branches:
-      - ayano-dev
+      - main
     paths:
       - "reverse-plot-tool/**"
       - ".github/workflows/deploy-reverse-plot-tool.yml"
@@ -31,11 +31,11 @@ jobs:
           ssh -p 22 "${{ secrets.KTSYS_LAB_USER }}@${{ secrets.KTSYS_LAB_HOST }}" '
             set -e
             cd /home/shino/work/upstream/Structured-storytelling-project
-            git fetch git@github.com:TWIN-SuperSport/Structured-storytelling-project.git ayano-dev
-            if git show-ref --verify --quiet refs/heads/ayano-dev; then
-              git checkout ayano-dev
+            git fetch git@github.com:TWIN-SuperSport/Structured-storytelling-project.git main
+            if git show-ref --verify --quiet refs/heads/main; then
+              git checkout main
             else
-              git checkout -b ayano-dev
+              git checkout -b main
             fi
             git reset --hard FETCH_HEAD
             cd reverse-plot-tool
