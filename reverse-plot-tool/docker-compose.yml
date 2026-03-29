@@ -1,0 +1,41 @@
+services:
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: reverse-plot-tool-php
+    working_dir: /app
+    volumes:
+      - .:/app
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: reverse-plot-tool-api
+    environment:
+      - LLM_BASE_URL=https://llm-relay.wos.ktsys.jp
+      - LLM_MODEL=qwen
+      - LLM_TIMEOUT=90
+
+  nginx:
+    image: nginx:1.28-alpine
+    container_name: reverse-plot-tool-nginx
+    depends_on:
+      - php
+      - api
+    environment:
+      - VIRTUAL_HOST=reverse-plot-tool.lab.ktsys.jp
+      - LETSENCRYPT_HOST=reverse-plot-tool.lab.ktsys.jp
+      - LETSENCRYPT_EMAIL=ken-tozawa@ktsys.jp
+      - VIRTUAL_PORT=80
+    volumes:
+      - .:/app:ro
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - default
+      - container_network
+
+networks:
+  container_network:
+    external: true

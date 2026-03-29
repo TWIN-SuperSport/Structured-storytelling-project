@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - ayano-dev
+  pull_request:
+    branches:
+      - main
+      - ayano-dev
+
+jobs:
+  reverse-plot-tool:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: reverse-plot-tool
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate compose
+        run: docker compose config
+
+      - name: Build PHP image
+        run: docker build -t reverse-plot-tool-php-test -f Dockerfile .
+
+      - name: Build API image
+        run: docker build -t reverse-plot-tool-api-test -f api/Dockerfile api
+
+      - name: Python syntax check
+        run: python3 -m py_compile api/main.py
