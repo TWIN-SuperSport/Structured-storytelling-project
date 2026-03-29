@@ -145,7 +145,25 @@
             protagonist_hint: document.getElementById('protagonist_hint').value
           })
         });
-        const data = await res.json();
+        const raw = await res.text();
+        let data = null;
+        try {
+          data = JSON.parse(raw);
+        } catch (parseError) {
+          if (!res.ok) {
+            output.textContent = `サーバエラー: HTTP ${res.status}\n\n${raw.slice(0, 1200)}`;
+            return;
+          }
+          throw new Error(`JSON parse failed: ${parseError.message}\n\n${raw.slice(0, 400)}`);
+        }
+        if (!res.ok) {
+          output.textContent = JSON.stringify({
+            status: 'error',
+            http_status: res.status,
+            body: data
+          }, null, 2);
+          return;
+        }
         output.textContent = JSON.stringify(data, null, 2);
       } catch (e) {
         output.textContent = String(e);
