@@ -98,6 +98,18 @@
       font-size: 0.9rem;
       line-height: 1.7;
     }
+    .field-stack {
+      margin-top: 12px;
+    }
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px 14px;
+      font: inherit;
+      background: #fffdfa;
+      color: var(--ink);
+    }
     @media (max-width: 800px) {
       .grid { grid-template-columns: 1fr; }
       .row { grid-template-columns: 1fr; }
@@ -122,6 +134,23 @@
             <input id="protagonist_hint" value="男子高校生">
           </div>
         </div>
+        <div class="field-stack">
+          <label for="wild_twist_level">突拍子レベル</label>
+          <select id="wild_twist_level">
+            <option value="0" selected>0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="7">7</option>
+            <option value="8">8</option>
+            <option value="9">9</option>
+            <option value="10">10</option>
+          </select>
+          <p class="hint">0 は堅実、10 は「転」で物語の見え方がひっくり返る級。ただし因果と結末整合は守る。</p>
+        </div>
         <button id="run-btn" type="button">物語構造を遡上する</button>
       </section>
       <section class="panel">
@@ -142,7 +171,8 @@
           body: JSON.stringify({
             ending_text: document.getElementById('ending_text').value,
             genre_hint: document.getElementById('genre_hint').value,
-            protagonist_hint: document.getElementById('protagonist_hint').value
+            protagonist_hint: document.getElementById('protagonist_hint').value,
+            wild_twist_level: Number(document.getElementById('wild_twist_level').value)
           })
         });
         const raw = await res.text();
