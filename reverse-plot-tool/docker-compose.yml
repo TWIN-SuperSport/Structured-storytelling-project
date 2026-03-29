@@ -14,9 +14,9 @@ services:
       dockerfile: Dockerfile
     container_name: reverse-plot-tool-api
     environment:
-      - LLM_BASE_URL=https://llm-relay.wos.ktsys.jp
-      - LLM_MODEL=qwen
-      - LLM_TIMEOUT=90
+      - LLM_BASE_URL=https://swallow-relay.wos.ktsys.jp
+      - LLM_MODEL=swallow
+      - LLM_TIMEOUT=120
 
   nginx:
     image: nginx:1.28-alpine
