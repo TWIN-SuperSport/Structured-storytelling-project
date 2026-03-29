@@ -39,5 +39,6 @@ jobs:
             fi
             git reset --hard FETCH_HEAD
             cd reverse-plot-tool
+            docker compose down --remove-orphans || true
             docker compose up -d --build
           '
