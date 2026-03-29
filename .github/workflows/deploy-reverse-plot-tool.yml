@@ -26,27 +26,18 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H "${{ secrets.KTSYS_LAB_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Pack reverse-plot-tool
-        run: tar -C reverse-plot-tool -czf reverse-plot-tool.tgz .
-
-      - name: Upload artifact to ktsys-lab
-        run: |
-          scp -P 22 reverse-plot-tool.tgz \
-            "${{ secrets.KTSYS_LAB_USER }}@${{ secrets.KTSYS_LAB_HOST }}:/tmp/reverse-plot-tool.tgz"
-
       - name: Deploy on ktsys-lab
         run: |
           ssh -p 22 "${{ secrets.KTSYS_LAB_USER }}@${{ secrets.KTSYS_LAB_HOST }}" '
             set -e
             cd /home/shino/work/upstream/Structured-storytelling-project
+            git fetch git@github.com:TWIN-SuperSport/Structured-storytelling-project.git ayano-dev
             if git show-ref --verify --quiet refs/heads/ayano-dev; then
               git checkout ayano-dev
             else
               git checkout -b ayano-dev
             fi
-            rm -rf reverse-plot-tool
-            mkdir -p reverse-plot-tool
-            tar -C reverse-plot-tool -xzf /tmp/reverse-plot-tool.tgz
+            git reset --hard FETCH_HEAD
             cd reverse-plot-tool
             docker compose up -d --build
           '
