@@ -603,6 +603,7 @@
         try {
           data = JSON.parse(raw);
         } catch (parseError) {
+          clearStatusTimer();
           setButtonsDisabled(false);
           setFieldsDisabled(false);
           setLoadingModal(false);
@@ -611,6 +612,7 @@
           return;
         }
         if (!res.ok) {
+          clearStatusTimer();
           setButtonsDisabled(false);
           setFieldsDisabled(false);
           setLoadingModal(false);
@@ -622,6 +624,7 @@
           }, null, 2);
           return;
         }
+        clearStatusTimer();
         setButtonsDisabled(false);
         setFieldsDisabled(false);
         setLoadingModal(false);
@@ -629,6 +632,7 @@
         output.textContent = JSON.stringify(data, null, 2);
         openEpilogueModal(data.choices || []);
       } catch (e) {
+        clearStatusTimer();
         setButtonsDisabled(false);
         setFieldsDisabled(false);
         setLoadingModal(false);
@@ -661,6 +665,7 @@
         try {
           data = JSON.parse(raw);
         } catch (parseError) {
+          clearStatusTimer();
           setButtonsDisabled(false);
           setFieldsDisabled(false);
           setLoadingModal(false);
@@ -669,6 +674,7 @@
           return;
         }
         if (!res.ok) {
+          clearStatusTimer();
           setButtonsDisabled(false);
           setFieldsDisabled(false);
           setLoadingModal(false);
@@ -681,6 +687,7 @@
           return;
         }
         flowCompleted = true;
+        clearStatusTimer();
         setButtonsDisabled(false);
         setFieldsDisabled(false);
         setLoadingModal(false);
@@ -688,6 +695,7 @@
         setStatus('<strong>段階選択完了</strong><br>確定済みの段から最終 JSON を生成した。', 'success');
         output.textContent = JSON.stringify(data, null, 2);
       } catch (e) {
+        clearStatusTimer();
         setButtonsDisabled(false);
         setFieldsDisabled(false);
         setLoadingModal(false);
