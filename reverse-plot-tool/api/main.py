@@ -6,9 +6,9 @@ import os
 
 app = FastAPI()
 
-LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://llm-relay.wos.ktsys.jp")
-LLM_MODEL = os.getenv("LLM_MODEL", "qwen")
-LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "90"))
+LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://swallow-relay.wos.ktsys.jp")
+LLM_MODEL = os.getenv("LLM_MODEL", "swallow")
+LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "240"))
 
 SYSTEM_PROMPT = """あなたは、物語の終着条件から成立条件を遡上して構造化するアシスタントです。
 ユーザーが与えた結末や終着条件から、物語の前提・欠落・欲望・誤信念・関係変化・転換点・起承転結・エピローグを逆算してください。
