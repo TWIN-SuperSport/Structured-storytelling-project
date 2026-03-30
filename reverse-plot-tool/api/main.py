@@ -83,6 +83,8 @@ STAGED_CHOICES_SYSTEM_PROMPT = """あなたは、物語の終着条件から各 
 重要:
 - 指定 step 以外の段は本文として返さない
 - すでに確定済みの後段がある場合は、それと整合する候補を出す
+- 各 step には物語上の役割があるので、その役割から逸脱しない
+- 前段へ何を受け渡すか、後段と何を矛盾させてはいけないかを守る
 - 各候補は 2〜3 文
 - 候補同士は意味や後味を少し変える
 - JSON 以外は返さない
@@ -96,6 +98,15 @@ STAGED_CHOICES_SYSTEM_PROMPT = """あなたは、物語の終着条件から各 
     "候補3"
   ]
 }"""
+
+STEP_ROLE_GUIDANCE = {
+    "epilogue": "epilogue は物語終了後の余韻と後日談を担う。決着後に残る感情や、その後の人生の方向を示す。",
+    "ketsu": "ketsu はクライマックス後の決着を担う。主人公の最終状態、代償、獲得、喪失を確定し、epilogue に自然につながる必要がある。",
+    "ten": "ten は見え方が反転する転換や、最終局面に向かう重大変化を担う。ketsu で収束するだけの因果を必ず用意する。",
+    "sho": "sho は前半で積み上げた前提を揺らし、葛藤を深める段。ten へ向かうための圧力や対立を育てる。",
+    "ki": "ki は初期配置、欠落、欲望、関係の出発点を置く段。sho で揺らぐ前提をここで準備する。",
+    "prologue": "prologue は読者を導入し、主人公と世界の入口を示す段。ki に入るための雰囲気と視点を整える。",
+}
 
 FINALIZE_SYSTEM_PROMPT = """あなたは、ユーザーが段階的に確定した plot をもとに、
 物語構造 JSON を完成させるアシスタントです。
@@ -374,11 +385,15 @@ def build_staged_choices_user_content(req: StagedChoicesRequest) -> str:
     if req.genre_hint:
         chunks.append(f"ジャンルヒント:\n{req.genre_hint.strip()}")
     chunks.append(f"対象 step:\n{step}")
+    chunks.append(f"step の役割:\n{STEP_ROLE_GUIDANCE[step]}")
     chunks.append(f"突拍子レベル:\n{req.wild_twist_level}")
     chunks.append(build_wild_twist_guidance(req.wild_twist_level))
     chunks.append(f"必要候補数:\n{req.choice_count}")
     if selected_plot:
         chunks.append("すでに確定済みの plot:\n" + json.dumps(selected_plot, ensure_ascii=False, indent=2))
+        chunks.append("重要:\n- すでに確定済みの後段と因果・感情・情報開示の順序を矛盾させない\n- 後段で初めて明かす内容を、この段で先に言い切らない")
+    else:
+        chunks.append("重要:\n- この段単体で浮かず、後段へ受け渡す因果の種を意識する")
     chunks.append(f"{step} 候補だけを複数案出してください。")
     return "\n\n".join(chunks)
 
