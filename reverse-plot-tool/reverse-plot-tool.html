@@ -407,7 +407,8 @@
     const loadingElapsed = document.getElementById('loading-elapsed');
     const formFields = Array.from(document.querySelectorAll('textarea, input, select'));
 
-    let waitingTimer = null;
+    let statusTimer = null;
+    let loadingTimer = null;
     let loadingStartedAt = null;
     let currentEpilogueChoices = [];
     const stagedStepOrder = ['epilogue', 'ketsu', 'ten', 'sho', 'ki', 'prologue'];
@@ -449,12 +450,24 @@
       statusBox.innerHTML = message;
     }
 
-    function clearWaitingTimer() {
-      if (waitingTimer !== null) {
-        clearInterval(waitingTimer);
-        waitingTimer = null;
+    function clearStatusTimer() {
+      if (statusTimer !== null) {
+        clearInterval(statusTimer);
+        statusTimer = null;
+      }
+    }
+
+    function clearLoadingTimer() {
+      if (loadingTimer !== null) {
+        clearInterval(loadingTimer);
+        loadingTimer = null;
       }
       loadingStartedAt = null;
+    }
+
+    function clearWaitingTimers() {
+      clearStatusTimer();
+      clearLoadingTimer();
     }
 
     function setFieldsDisabled(disabled) {
@@ -466,10 +479,10 @@
     function setLoadingModal(open, message = '候補を生成してる。少し待ってて。') {
       loadingCopy.textContent = message;
       if (open) {
-        clearWaitingTimer();
+        clearLoadingTimer();
         loadingStartedAt = Date.now();
         loadingElapsed.textContent = '経過 0 秒';
-        waitingTimer = setInterval(() => {
+        loadingTimer = setInterval(() => {
           if (loadingStartedAt === null) {
             return;
           }
@@ -479,7 +492,7 @@
         loadingModal.classList.add('is-blocking');
         loadingModal.setAttribute('aria-hidden', 'false');
       } else {
-        clearWaitingTimer();
+        clearLoadingTimer();
         loadingModal.classList.remove('is-blocking');
         loadingModal.setAttribute('aria-hidden', 'true');
       }
@@ -532,8 +545,9 @@
         }
         setStatus(`<strong>送信済み</strong><br>${phase}<br>経過 ${elapsed} 秒`, 'busy');
       };
+      clearStatusTimer();
       render();
-      waitingTimer = setInterval(render, 1000);
+      statusTimer = setInterval(render, 1000);
     }
 
     function renderSelectedPlot() {
@@ -559,7 +573,7 @@
       setFieldsDisabled(true);
       setLoadingModal(true, `${stagedStepLabels[step]} 候補を生成してる。いまは入力をロックしてる。`);
       output.textContent = `${stagedStepLabels[step]} 候補の返却待ち...`;
-      setStatus(`<strong>送信済み</strong><br>${stagedStepLabels[step]} 候補を生成してる。`, 'busy');
+      startWaitingStatus();
 
       const endpoint = step === 'epilogue'
         ? '/api/story/reverse-plot/staged/epilogue'
@@ -628,7 +642,7 @@
       setFieldsDisabled(true);
       setLoadingModal(true, '最終 JSON を組み立ててる。いまは入力をロックしてる。');
       output.textContent = '確定済み段から最終 JSON を組み立ててる...';
-      setStatus('<strong>最終組み立て中</strong><br>確定済みの各段から物語構造 JSON を完成させてる。', 'busy');
+      startWaitingStatus();
 
       try {
         const res = await fetch('/api/story/reverse-plot/staged/finalize', {
@@ -683,7 +697,7 @@
     }
 
     epilogueBtn.addEventListener('click', async () => {
-      clearWaitingTimer();
+      clearWaitingTimers();
       if (flowCompleted) {
         flowCompleted = false;
         currentStage = 'epilogue';
@@ -718,7 +732,7 @@
         setStatus(`<strong>${stagedStepLabels[confirmedStep]} 確定</strong><br>次は ${stagedStepLabels[nextStep]}。ボタンを押すと候補を作成する。`, 'success');
         return;
       }
-      setStatus('<strong>plot 確定完了</strong><br>5段すべてを選んだ。最終 JSON を組み立てる。', 'success');
+      setStatus('<strong>plot 確定完了</strong><br>6段すべてを選んだ。最終 JSON を組み立てる。', 'success');
       finalizeStagedStory();
     });
 
@@ -733,6 +747,10 @@
     epilogueModal.addEventListener('click', (event) => {
       if (event.target === epilogueModal) {
         closeEpilogueModal();
+        setButtonsDisabled(false);
+        setFieldsDisabled(false);
+        setLoadingModal(false);
+        setStatus(`<strong>候補表示を閉じた</strong><br>${stagedStepLabels[currentStage]} はまだ未確定。続ける時は同じボタンを押して。`, 'success');
       }
     });
 

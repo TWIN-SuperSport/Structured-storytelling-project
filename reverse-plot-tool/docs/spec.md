@@ -3,6 +3,7 @@
 ## 概要
 
 結末や終着条件から、物語の成立条件を遡上して物語構造 JSON を生成する。
+現在は、一括生成 API と staged flow API を併用している。
 
 ## 入力
 
@@ -11,40 +12,184 @@
 - `genre_hint` (任意)
 - `wild_twist_level` (0〜10, 任意, 既定値 0)
 
-## 出力
+## 一括生成 API
 
-- 物語構造 JSON
-- `plot.prologue`, `plot.ki`, `plot.sho`, `plot.ten`, `plot.ketsu`, `plot.epilogue`
-- 構造条件:
-  - `initial_lack`
-  - `desire`
-  - `fear`
-  - `false_belief`
-  - `starting_situation`
-- 関係変化、転換点、破綻条件
+- `POST /api/story/reverse-plot`
+- 成功時は `status` と `story` を返す
+- `story` の中に物語構造 JSON 本体を入れる
 
-## 段階選択フロー
+### 一括生成レスポンス例
 
-- 従来の一括 JSON 生成に加えて、段階選択フローを持つ
+```json
+{
+  "status": "success",
+  "story": {
+    "title": "仮タイトル",
+    "ending_summary": "物語の結末要約",
+    "core_theme": "中心テーマ",
+    "protagonist_final_state": "結末時の主人公の状態",
+    "structural_conditions": {
+      "initial_lack": "初期欠落",
+      "desire": "主人公の欲望",
+      "fear": "主人公の恐れ",
+      "false_belief": "誤信念",
+      "starting_situation": "物語開始時の初期配置"
+    },
+    "relationship_changes": [
+      "必要な関係変化1",
+      "必要な関係変化2"
+    ],
+    "required_turning_points": [
+      "必要な転換点1",
+      "必要な転換点2",
+      "必要な転換点3"
+    ],
+    "failure_conditions": [
+      "破綻してはいけない条件1",
+      "破綻してはいけない条件2"
+    ],
+    "plot": {
+      "prologue": "2〜3文のあらすじ",
+      "ki": "2〜3文のあらすじ",
+      "sho": "2〜3文のあらすじ",
+      "ten": "2〜3文のあらすじ",
+      "ketsu": "2〜3文のあらすじ",
+      "epilogue": "2〜3文のあらすじ"
+    }
+  }
+}
+```
+
+## staged flow
+
 - 一括 JSON 生成ボタンは置かず、現在どの段を作成するかを固定文言で表示する
 - 段階選択は `epilogue -> ketsu -> ten -> sho -> ki -> prologue` の順で進める
-- 段階選択の実行ボタン表記は `xxxxx候補の作成及び選択` とする
+- 実行ボタン表記は `xxxxx候補の作成及び選択` とする
 - 確定済みの plot は 1 つの長文欄に連結せず、段ごとのカードとして表示する
 - 各段で候補を 3 件返し、ユーザーは modal 内の radio で 1 件を確定する
 - 各段の確定後、次段候補は自動では取りに行かず、ボタン押下で進む
 - modal を閉じても進捗は捨てず、その時点の段から再開できる
 - 確定済みの後段は次段候補の生成条件として API に渡す
-- 5 段すべて確定後、最終組み立て API が構造情報を補完して完成 JSON を返す
+- 6 段すべて確定後、最終組み立て API が構造情報を補完して完成 JSON を返す
 - 各段の候補生成 prompt には、その段の役割と前後段への接続条件を入れる
 
-## 段階選択 API
+## staged flow API
 
-- `POST /api/story/reverse-plot/staged/epilogue`
-  - `epilogue` 候補を返す
-- `POST /api/story/reverse-plot/staged/choices`
-  - `step` と `selected_plot` を受け取り、指定段の候補を返す
-- `POST /api/story/reverse-plot/staged/finalize`
-  - 5 段すべての `selected_plot` を受け取り、最終 JSON を返す
+### `POST /api/story/reverse-plot/staged/epilogue`
+
+- `epilogue` 候補を返す
+- 成功時レスポンスは `status`, `step`, `choices` を返す
+- `choices` は文字列配列ではなく、`id` と `text` を持つ object 配列
+
+#### レスポンス例
+
+```json
+{
+  "status": "success",
+  "step": "epilogue",
+  "choices": [
+    {
+      "id": "epilogue_1",
+      "text": "候補1"
+    },
+    {
+      "id": "epilogue_2",
+      "text": "候補2"
+    },
+    {
+      "id": "epilogue_3",
+      "text": "候補3"
+    }
+  ]
+}
+```
+
+### `POST /api/story/reverse-plot/staged/choices`
+
+- `step` と `selected_plot` を受け取り、指定段の候補を返す
+- 成功時レスポンスは `status`, `step`, `choices` を返す
+- `choices` は `id` と `text` を持つ object 配列
+
+#### リクエスト補足
+
+- `step` は `ketsu`, `ten`, `sho`, `ki`, `prologue` のいずれか
+- `selected_plot` は、すでに確定済みの後段だけを入れる
+
+#### レスポンス例
+
+```json
+{
+  "status": "success",
+  "step": "ketsu",
+  "choices": [
+    {
+      "id": "ketsu_1",
+      "text": "候補1"
+    },
+    {
+      "id": "ketsu_2",
+      "text": "候補2"
+    },
+    {
+      "id": "ketsu_3",
+      "text": "候補3"
+    }
+  ]
+}
+```
+
+### `POST /api/story/reverse-plot/staged/finalize`
+
+- 6 段すべての `selected_plot` を受け取り、最終 JSON を返す
+- 成功時レスポンスは `status` と `story` を返す
+- `story` が最終的な物語構造 JSON 本体
+
+#### リクエスト補足
+
+- `selected_plot` には `prologue`, `ki`, `sho`, `ten`, `ketsu`, `epilogue` をすべて含める
+- 1 つでも欠けると 400 を返す
+
+#### レスポンス例
+
+```json
+{
+  "status": "success",
+  "story": {
+    "title": "仮タイトル",
+    "ending_summary": "物語の結末要約",
+    "core_theme": "中心テーマ",
+    "protagonist_final_state": "結末時の主人公の状態",
+    "structural_conditions": {
+      "initial_lack": "初期欠落",
+      "desire": "主人公の欲望",
+      "fear": "主人公の恐れ",
+      "false_belief": "誤信念",
+      "starting_situation": "物語開始時の初期配置"
+    },
+    "relationship_changes": [
+      "必要な関係変化1",
+      "必要な関係変化2"
+    ],
+    "required_turning_points": [
+      "必要な転換点1",
+      "必要な転換点2",
+      "必要な転換点3"
+    ],
+    "failure_conditions": [
+      "破綻してはいけない条件1",
+      "破綻してはいけない条件2"
+    ],
+    "plot": {
+      "prologue": "2〜3文のあらすじ",
+      "ki": "2〜3文のあらすじ",
+      "sho": "2〜3文のあらすじ",
+      "ten": "2〜3文のあらすじ",
+      "ketsu": "2〜3文のあらすじ",
+      "epilogue": "2〜3文のあらすじ"
+    }
+  }
+}
+```
 
 ## UI 待機表示
 
