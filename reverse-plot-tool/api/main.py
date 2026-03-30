@@ -3,12 +3,14 @@ from pydantic import BaseModel, Field
 import httpx
 import json
 import os
+import asyncio
 
 app = FastAPI()
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://swallow-relay.wos.ktsys.jp")
 LLM_MODEL = os.getenv("LLM_MODEL", "swallow")
 LLM_TIMEOUT = float(os.getenv("LLM_TIMEOUT", "240"))
+LLM_POLL_INTERVAL = float(os.getenv("LLM_POLL_INTERVAL", "2"))
 
 SYSTEM_PROMPT = """あなたは、物語の終着条件から成立条件を遡上して構造化するアシスタントです。
 ユーザーが与えた結末や終着条件から、物語の前提・欠落・欲望・誤信念・関係変化・転換点・起承転結・エピローグを逆算してください。
@@ -61,19 +63,55 @@ class ReversePlotRequest(BaseModel):
     output_format_version: str | None = None
 
 
+async def submit_llm_job(client: httpx.AsyncClient, messages: list[dict]) -> str:
+    res = await client.post(
+        f"{LLM_BASE_URL}/v1/jobs/chat/completions",
+        json={
+            "model": LLM_MODEL,
+            "messages": messages,
+            "max_tokens": 1400,
+            "temperature": 0.7,
+        },
+    )
+    res.raise_for_status()
+    body = res.json()
+    job_id = body.get("job_id")
+    if not job_id:
+        raise ValueError("relay が job_id を返しませんでした")
+    return job_id
+
+
+async def poll_llm_job(client: httpx.AsyncClient, job_id: str) -> dict:
+    deadline = asyncio.get_running_loop().time() + LLM_TIMEOUT
+
+    while True:
+        if asyncio.get_running_loop().time() >= deadline:
+            raise httpx.TimeoutException("LLM job polling timed out")
+
+        status_res = await client.get(f"{LLM_BASE_URL}/v1/jobs/{job_id}")
+        status_res.raise_for_status()
+        status_body = status_res.json()
+        status = status_body.get("status")
+
+        if status == "success":
+            result_res = await client.get(f"{LLM_BASE_URL}/v1/jobs/{job_id}/result")
+            result_res.raise_for_status()
+            result_body = result_res.json()
+            return result_body["result_json"]
+
+        if status in {"error", "expired"}:
+            error_code = status_body.get("error_code") or status
+            error_message = status_body.get("error_message") or f"LLM job failed: {status}"
+            raise RuntimeError(f"{error_code}: {error_message}")
+
+        await asyncio.sleep(LLM_POLL_INTERVAL)
+
+
 async def call_llm(messages: list[dict]) -> dict:
     async with httpx.AsyncClient(timeout=LLM_TIMEOUT, verify=False) as client:
-        res = await client.post(
-            f"{LLM_BASE_URL}/v1/chat/completions",
-            json={
-                "model": LLM_MODEL,
-                "messages": messages,
-                "max_tokens": 1400,
-                "temperature": 0.7,
-            },
-        )
-        res.raise_for_status()
-        content = res.json()["choices"][0]["message"]["content"]
+        job_id = await submit_llm_job(client, messages)
+        result_json = await poll_llm_job(client, job_id)
+        content = result_json["choices"][0]["message"]["content"]
         start = content.find("{")
         end = content.rfind("}") + 1
         if start == -1 or end == 0:
