@@ -85,6 +85,10 @@
       color: white;
       cursor: pointer;
     }
+    button[disabled] {
+      opacity: 0.72;
+      cursor: wait;
+    }
     pre {
       margin: 0;
       white-space: pre-wrap;
@@ -100,6 +104,33 @@
     }
     .field-stack {
       margin-top: 12px;
+    }
+    .status {
+      margin: 0 0 14px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.72);
+      line-height: 1.7;
+      color: var(--muted);
+    }
+    .status strong {
+      color: var(--ink);
+    }
+    .status.is-busy {
+      border-color: rgba(201,143,84,0.65);
+      background: rgba(201,143,84,0.12);
+      color: #6b4026;
+    }
+    .status.is-error {
+      border-color: rgba(143,77,46,0.45);
+      background: rgba(143,77,46,0.10);
+      color: #6b2f1c;
+    }
+    .status.is-success {
+      border-color: rgba(110,136,96,0.45);
+      background: rgba(110,136,96,0.12);
+      color: #35502f;
     }
     select {
       width: 100%;
@@ -155,6 +186,7 @@
       </section>
       <section class="panel">
         <p class="hint">いまは JSON をそのまま表示する。最終的にはこの正本から `.md` のプロットを起こす想定。</p>
+        <div id="status-box" class="status">まだ送信してないよ。終着条件を整えたら、下の JSON 欄に結果が出る。</div>
         <pre id="output">ここに結果が出る。</pre>
       </section>
     </div>
@@ -162,8 +194,48 @@
   <script>
     const btn = document.getElementById('run-btn');
     const output = document.getElementById('output');
+    const statusBox = document.getElementById('status-box');
+
+    let waitingTimer = null;
+
+    function setStatus(message, mode = '') {
+      statusBox.className = `status${mode ? ` is-${mode}` : ''}`;
+      statusBox.innerHTML = message;
+    }
+
+    function clearWaitingTimer() {
+      if (waitingTimer !== null) {
+        clearInterval(waitingTimer);
+        waitingTimer = null;
+      }
+    }
+
+    function startWaitingStatus() {
+      const startedAt = Date.now();
+      const render = () => {
+        const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+        let phase = 'リレーに依頼を投げて、生成結果を待ってる。';
+        if (elapsed >= 15) {
+          phase = 'Swallow が長めに考えてる。重い生成だとこのくらい待つことがある。';
+        }
+        if (elapsed >= 45) {
+          phase = 'まだ処理中。固まってるわけじゃなく、重めの候補生成が続いてる。';
+        }
+        if (elapsed >= 90) {
+          phase = 'かなり長考中。結果が返るまでこのまま待ってて大丈夫。';
+        }
+        setStatus(`<strong>送信済み</strong><br>${phase}<br>経過 ${elapsed} 秒`, 'busy');
+      };
+      render();
+      waitingTimer = setInterval(render, 1000);
+    }
+
     btn.addEventListener('click', async () => {
-      output.textContent = '考え中...';
+      clearWaitingTimer();
+      btn.disabled = true;
+      btn.textContent = '生成待ち...';
+      output.textContent = 'JSON の返却待ち...';
+      startWaitingStatus();
       try {
         const res = await fetch('/api/story/reverse-plot', {
           method: 'POST',
@@ -180,13 +252,22 @@
         try {
           data = JSON.parse(raw);
         } catch (parseError) {
+          clearWaitingTimer();
+          btn.disabled = false;
+          btn.textContent = '物語構造を遡上する';
           if (!res.ok) {
+            setStatus(`<strong>エラー</strong><br>サーバが JSON 以外を返した。HTTP ${res.status}`, 'error');
             output.textContent = `サーバエラー: HTTP ${res.status}\n\n${raw.slice(0, 1200)}`;
             return;
           }
+          setStatus('<strong>エラー</strong><br>レスポンスの JSON 解析に失敗した。', 'error');
           throw new Error(`JSON parse failed: ${parseError.message}\n\n${raw.slice(0, 400)}`);
         }
         if (!res.ok) {
+          clearWaitingTimer();
+          btn.disabled = false;
+          btn.textContent = '物語構造を遡上する';
+          setStatus(`<strong>エラー</strong><br>生成は完了しなかった。HTTP ${res.status} の応答を受け取った。`, 'error');
           output.textContent = JSON.stringify({
             status: 'error',
             http_status: res.status,
@@ -194,8 +275,16 @@
           }, null, 2);
           return;
         }
+        clearWaitingTimer();
+        btn.disabled = false;
+        btn.textContent = '物語構造を遡上する';
+        setStatus('<strong>生成完了</strong><br>JSON が返ってきた。内容を下で確認して。', 'success');
         output.textContent = JSON.stringify(data, null, 2);
       } catch (e) {
+        clearWaitingTimer();
+        btn.disabled = false;
+        btn.textContent = '物語構造を遡上する';
+        setStatus('<strong>通信エラー</strong><br>結果取得中に失敗した。下の内容をそのまま見れば切り分けできる。', 'error');
         output.textContent = String(e);
       }
     });
