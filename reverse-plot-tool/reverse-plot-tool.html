@@ -308,6 +308,16 @@
 
     let waitingTimer = null;
     let currentEpilogueChoices = [];
+    const stagedStepOrder = ['epilogue', 'ten', 'sho', 'ki', 'prologue'];
+    const stagedStepLabels = {
+      epilogue: 'epilogue',
+      ten: 'ten',
+      sho: 'sho',
+      ki: 'ki',
+      prologue: 'prologue'
+    };
+    const selectedPlot = {};
+    let currentStage = 'epilogue';
 
     function setStatus(message, mode = '') {
       statusBox.className = `status${mode ? ` is-${mode}` : ''}`;
@@ -325,7 +335,7 @@
       btn.disabled = disabled;
       epilogueBtn.disabled = disabled;
       btn.textContent = disabled ? '生成待ち...' : '物語構造を遡上する';
-      epilogueBtn.textContent = disabled ? '候補生成待ち...' : 'epilogue 候補を選ぶ';
+      epilogueBtn.textContent = disabled ? '候補生成待ち...' : '段階選択をはじめる';
     }
 
     function closeEpilogueModal() {
@@ -335,6 +345,9 @@
 
     function openEpilogueModal(choices) {
       currentEpilogueChoices = choices;
+      epilogueModal.querySelector('.modal-head strong').textContent = `${stagedStepLabels[currentStage]} 候補を選ぶ`;
+      epilogueModal.querySelector('.modal-head .hint').textContent = `${stagedStepLabels[currentStage]} 候補を1つ選んで確定すると、次の段へ進む。`;
+      epilogueConfirmBtn.textContent = `${stagedStepLabels[currentStage]} を確定`;
       epilogueChoices.innerHTML = choices.map((choice, index) => `
         <label class="choice-option">
           <input type="radio" name="epilogue-choice" value="${choice.id}" ${index === 0 ? 'checked' : ''}>
@@ -363,6 +376,123 @@
       };
       render();
       waitingTimer = setInterval(render, 1000);
+    }
+
+    function renderSelectedPlot() {
+      const lines = stagedStepOrder
+        .filter((step) => selectedPlot[step])
+        .map((step) => `${stagedStepLabels[step]}: ${selectedPlot[step]}`);
+
+      selectedEpilogue.textContent = lines.length
+        ? lines.join('\n\n')
+        : 'まだ未選択。段階選択をはじめる から候補を出せる。';
+    }
+
+    async function fetchStageChoices(step) {
+      currentStage = step;
+      setButtonsDisabled(true);
+      output.textContent = `${stagedStepLabels[step]} 候補の返却待ち...`;
+      setStatus(`<strong>送信済み</strong><br>${stagedStepLabels[step]} 候補を生成してる。`, 'busy');
+
+      const endpoint = step === 'epilogue'
+        ? '/api/story/reverse-plot/staged/epilogue'
+        : '/api/story/reverse-plot/staged/choices';
+
+      const body = {
+        ending_text: document.getElementById('ending_text').value,
+        genre_hint: document.getElementById('genre_hint').value,
+        protagonist_hint: document.getElementById('protagonist_hint').value,
+        wild_twist_level: Number(document.getElementById('wild_twist_level').value),
+        choice_count: 3
+      };
+
+      if (step !== 'epilogue') {
+        body.step = step;
+        body.selected_plot = selectedPlot;
+      }
+
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const raw = await res.text();
+        let data = null;
+        try {
+          data = JSON.parse(raw);
+        } catch (parseError) {
+          setButtonsDisabled(false);
+          setStatus(`<strong>エラー</strong><br>${stagedStepLabels[step]} 候補 API が JSON 以外を返した。HTTP ${res.status}`, 'error');
+          output.textContent = `サーバエラー: HTTP ${res.status}\n\n${raw.slice(0, 1200)}`;
+          return;
+        }
+        if (!res.ok) {
+          setButtonsDisabled(false);
+          setStatus(`<strong>エラー</strong><br>${stagedStepLabels[step]} 候補生成に失敗した。HTTP ${res.status}`, 'error');
+          output.textContent = JSON.stringify({
+            status: 'error',
+            http_status: res.status,
+            body: data
+          }, null, 2);
+          return;
+        }
+        setButtonsDisabled(false);
+        setStatus(`<strong>候補生成完了</strong><br>${stagedStepLabels[step]} 候補を選んで確定して。`, 'success');
+        output.textContent = JSON.stringify(data, null, 2);
+        openEpilogueModal(data.choices || []);
+      } catch (e) {
+        setButtonsDisabled(false);
+        setStatus(`<strong>通信エラー</strong><br>${stagedStepLabels[step]} 候補取得に失敗した。`, 'error');
+        output.textContent = String(e);
+      }
+    }
+
+    async function finalizeStagedStory() {
+      setButtonsDisabled(true);
+      output.textContent = '確定済み段から最終 JSON を組み立ててる...';
+      setStatus('<strong>最終組み立て中</strong><br>確定済みの各段から物語構造 JSON を完成させてる。', 'busy');
+
+      try {
+        const res = await fetch('/api/story/reverse-plot/staged/finalize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ending_text: document.getElementById('ending_text').value,
+            genre_hint: document.getElementById('genre_hint').value,
+            protagonist_hint: document.getElementById('protagonist_hint').value,
+            wild_twist_level: Number(document.getElementById('wild_twist_level').value),
+            selected_plot: selectedPlot
+          })
+        });
+        const raw = await res.text();
+        let data = null;
+        try {
+          data = JSON.parse(raw);
+        } catch (parseError) {
+          setButtonsDisabled(false);
+          setStatus(`<strong>エラー</strong><br>最終組み立て API が JSON 以外を返した。HTTP ${res.status}`, 'error');
+          output.textContent = `サーバエラー: HTTP ${res.status}\n\n${raw.slice(0, 1200)}`;
+          return;
+        }
+        if (!res.ok) {
+          setButtonsDisabled(false);
+          setStatus(`<strong>エラー</strong><br>最終 JSON 組み立てに失敗した。HTTP ${res.status}`, 'error');
+          output.textContent = JSON.stringify({
+            status: 'error',
+            http_status: res.status,
+            body: data
+          }, null, 2);
+          return;
+        }
+        setButtonsDisabled(false);
+        setStatus('<strong>段階選択完了</strong><br>確定済みの段から最終 JSON を生成した。', 'success');
+        output.textContent = JSON.stringify(data, null, 2);
+      } catch (e) {
+        setButtonsDisabled(false);
+        setStatus('<strong>通信エラー</strong><br>最終 JSON の取得に失敗した。', 'error');
+        output.textContent = String(e);
+      }
     }
 
     btn.addEventListener('click', async () => {
@@ -421,50 +551,9 @@
 
     epilogueBtn.addEventListener('click', async () => {
       clearWaitingTimer();
-      setButtonsDisabled(true);
-      output.textContent = 'epilogue 候補の返却待ち...';
-      setStatus('<strong>送信済み</strong><br>epilogue 候補をまとめて生成してる。', 'busy');
-      try {
-        const res = await fetch('/api/story/reverse-plot/staged/epilogue', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ending_text: document.getElementById('ending_text').value,
-            genre_hint: document.getElementById('genre_hint').value,
-            protagonist_hint: document.getElementById('protagonist_hint').value,
-            wild_twist_level: Number(document.getElementById('wild_twist_level').value),
-            choice_count: 3
-          })
-        });
-        const raw = await res.text();
-        let data = null;
-        try {
-          data = JSON.parse(raw);
-        } catch (parseError) {
-          setButtonsDisabled(false);
-          setStatus(`<strong>エラー</strong><br>候補 API が JSON 以外を返した。HTTP ${res.status}`, 'error');
-          output.textContent = `サーバエラー: HTTP ${res.status}\n\n${raw.slice(0, 1200)}`;
-          return;
-        }
-        if (!res.ok) {
-          setButtonsDisabled(false);
-          setStatus(`<strong>エラー</strong><br>epilogue 候補生成に失敗した。HTTP ${res.status}`, 'error');
-          output.textContent = JSON.stringify({
-            status: 'error',
-            http_status: res.status,
-            body: data
-          }, null, 2);
-          return;
-        }
-        setButtonsDisabled(false);
-        setStatus('<strong>候補生成完了</strong><br>epilogue 候補を選んで確定して。', 'success');
-        output.textContent = JSON.stringify(data, null, 2);
-        openEpilogueModal(data.choices || []);
-      } catch (e) {
-        setButtonsDisabled(false);
-        setStatus('<strong>通信エラー</strong><br>epilogue 候補取得に失敗した。', 'error');
-        output.textContent = String(e);
-      }
+      stagedStepOrder.forEach((step) => delete selectedPlot[step]);
+      renderSelectedPlot();
+      await fetchStageChoices('epilogue');
     });
 
     epilogueConfirmBtn.addEventListener('click', () => {
@@ -478,9 +567,18 @@
         setStatus('<strong>エラー</strong><br>選択候補を解決できなかった。', 'error');
         return;
       }
-      selectedEpilogue.textContent = picked.text;
+      selectedPlot[currentStage] = picked.text;
+      renderSelectedPlot();
       closeEpilogueModal();
-      setStatus('<strong>epilogue 確定</strong><br>最初の段として epilogue を保持した。次は ten へ進む設計。', 'success');
+      const nextIndex = stagedStepOrder.indexOf(currentStage) + 1;
+      const nextStep = stagedStepOrder[nextIndex];
+      if (nextStep) {
+        setStatus(`<strong>${stagedStepLabels[currentStage]} 確定</strong><br>次は ${stagedStepLabels[nextStep]} 候補を生成する。`, 'success');
+        fetchStageChoices(nextStep);
+        return;
+      }
+      setStatus('<strong>plot 確定完了</strong><br>5段すべてを選んだ。最終 JSON を組み立てる。', 'success');
+      finalizeStagedStory();
     });
 
     epilogueCancelBtn.addEventListener('click', () => {
@@ -492,6 +590,8 @@
         closeEpilogueModal();
       }
     });
+
+    renderSelectedPlot();
   </script>
 </body>
 </html>
