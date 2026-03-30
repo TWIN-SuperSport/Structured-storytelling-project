@@ -23,6 +23,23 @@
   - `starting_situation`
 - 関係変化、転換点、破綻条件
 
+## 段階選択フロー
+
+- 従来の一括 JSON 生成に加えて、段階選択フローを持つ
+- 段階選択は `epilogue -> ten -> sho -> ki -> prologue` の順で進める
+- 各段で候補を 3 件返し、ユーザーは modal 内の radio で 1 件を確定する
+- 確定済みの後段は次段候補の生成条件として API に渡す
+- 5 段すべて確定後、最終組み立て API が構造情報を補完して完成 JSON を返す
+
+## 段階選択 API
+
+- `POST /api/story/reverse-plot/staged/epilogue`
+  - `epilogue` 候補を返す
+- `POST /api/story/reverse-plot/staged/choices`
+  - `step` と `selected_plot` を受け取り、指定段の候補を返す
+- `POST /api/story/reverse-plot/staged/finalize`
+  - 5 段すべての `selected_plot` を受け取り、最終 JSON を返す
+
 ## UI 待機表示
 
 - 生成開始直後は単に「考え中」とせず、`送信済み` として relay へ依頼を投げ終わったことを明示する
