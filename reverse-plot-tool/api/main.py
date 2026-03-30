@@ -6,7 +6,7 @@ import os
 import asyncio
 
 app = FastAPI()
-PLOT_STEP_ORDER = ["epilogue", "ten", "sho", "ki", "prologue"]
+PLOT_STEP_ORDER = ["epilogue", "ketsu", "ten", "sho", "ki", "prologue"]
 APP_VERSION = os.getenv("APP_VERSION", "dev")
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://swallow-relay.wos.ktsys.jp")
