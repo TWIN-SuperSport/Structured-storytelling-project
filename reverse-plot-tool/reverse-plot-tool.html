@@ -246,6 +246,32 @@
       color: var(--ink);
       white-space: pre-wrap;
     }
+    .loading-stack {
+      display: grid;
+      justify-items: center;
+      gap: 14px;
+      text-align: center;
+    }
+    .loading-spinner {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      border: 4px solid rgba(201,143,84,0.22);
+      border-top-color: var(--accent);
+      border-right-color: var(--accent-2);
+      animation: spin 0.9s linear infinite;
+      box-shadow: 0 0 0 6px rgba(201,143,84,0.08);
+    }
+    .loading-elapsed {
+      color: var(--muted);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.9rem;
+      letter-spacing: 0.03em;
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
     .choice-option {
       display: grid;
       grid-template-columns: auto 1fr;
@@ -357,7 +383,11 @@
         <span class="hint">いまは入力をロックして、LLM の返答待ちにしてる。</span>
       </div>
       <div class="modal-body">
-        <p id="loading-copy" class="loading-copy">候補を生成してる。少し待ってて。</p>
+        <div class="loading-stack">
+          <div class="loading-spinner" aria-hidden="true"></div>
+          <p id="loading-copy" class="loading-copy">候補を生成してる。少し待ってて。</p>
+          <div id="loading-elapsed" class="loading-elapsed">経過 0 秒</div>
+        </div>
       </div>
     </div>
   </div>
@@ -374,9 +404,11 @@
     const epilogueCancelBtn = document.getElementById('epilogue-cancel-btn');
     const loadingModal = document.getElementById('loading-modal');
     const loadingCopy = document.getElementById('loading-copy');
+    const loadingElapsed = document.getElementById('loading-elapsed');
     const formFields = Array.from(document.querySelectorAll('textarea, input, select'));
 
     let waitingTimer = null;
+    let loadingStartedAt = null;
     let currentEpilogueChoices = [];
     const stagedStepOrder = ['epilogue', 'ketsu', 'ten', 'sho', 'ki', 'prologue'];
     const stagedStepLabels = {
@@ -422,6 +454,7 @@
         clearInterval(waitingTimer);
         waitingTimer = null;
       }
+      loadingStartedAt = null;
     }
 
     function setFieldsDisabled(disabled) {
@@ -433,9 +466,20 @@
     function setLoadingModal(open, message = '候補を生成してる。少し待ってて。') {
       loadingCopy.textContent = message;
       if (open) {
+        clearWaitingTimer();
+        loadingStartedAt = Date.now();
+        loadingElapsed.textContent = '経過 0 秒';
+        waitingTimer = setInterval(() => {
+          if (loadingStartedAt === null) {
+            return;
+          }
+          const elapsed = Math.floor((Date.now() - loadingStartedAt) / 1000);
+          loadingElapsed.textContent = `経過 ${elapsed} 秒`;
+        }, 1000);
         loadingModal.classList.add('is-blocking');
         loadingModal.setAttribute('aria-hidden', 'false');
       } else {
+        clearWaitingTimer();
         loadingModal.classList.remove('is-blocking');
         loadingModal.setAttribute('aria-hidden', 'true');
       }
