@@ -210,6 +210,10 @@
     .modal.is-open {
       display: flex;
     }
+    .modal.is-blocking {
+      display: flex;
+      background: rgba(22, 17, 12, 0.62);
+    }
     .modal-panel {
       width: min(760px, 100%);
       max-height: min(78vh, 760px);
@@ -235,6 +239,12 @@
     .modal-body {
       padding: 14px 18px 18px;
       overflow: auto;
+    }
+    .loading-copy {
+      margin: 0;
+      line-height: 1.8;
+      color: var(--ink);
+      white-space: pre-wrap;
     }
     .choice-option {
       display: grid;
@@ -340,6 +350,17 @@
       </div>
     </div>
   </div>
+  <div id="loading-modal" class="modal" aria-hidden="true">
+    <div class="modal-panel">
+      <div class="modal-head">
+        <strong>問い合わせ中</strong><br>
+        <span class="hint">いまは入力をロックして、LLM の返答待ちにしてる。</span>
+      </div>
+      <div class="modal-body">
+        <p id="loading-copy" class="loading-copy">候補を生成してる。少し待ってて。</p>
+      </div>
+    </div>
+  </div>
   <script>
     const stageIntro = document.getElementById('stage-intro');
     const epilogueBtn = document.getElementById('epilogue-btn');
@@ -351,6 +372,9 @@
     const epilogueChoices = document.getElementById('epilogue-choices');
     const epilogueConfirmBtn = document.getElementById('epilogue-confirm-btn');
     const epilogueCancelBtn = document.getElementById('epilogue-cancel-btn');
+    const loadingModal = document.getElementById('loading-modal');
+    const loadingCopy = document.getElementById('loading-copy');
+    const formFields = Array.from(document.querySelectorAll('textarea, input, select'));
 
     let waitingTimer = null;
     let currentEpilogueChoices = [];
@@ -365,10 +389,13 @@
     };
     const selectedPlot = {};
     let currentStage = 'epilogue';
+    let flowCompleted = false;
 
     function updateStageIntro(step) {
       stageIntro.textContent = `物語構造を遡上します。(${stagedStepLabels[step]} を作成します)`;
-      epilogueBtn.textContent = `${stagedStepLabels[step]}候補の作成及び選択`;
+      if (!flowCompleted) {
+        epilogueBtn.textContent = `${stagedStepLabels[step]}候補の作成及び選択`;
+      }
     }
 
     async function loadVersion() {
@@ -397,10 +424,31 @@
       }
     }
 
+    function setFieldsDisabled(disabled) {
+      formFields.forEach((field) => {
+        field.disabled = disabled;
+      });
+    }
+
+    function setLoadingModal(open, message = '候補を生成してる。少し待ってて。') {
+      loadingCopy.textContent = message;
+      if (open) {
+        loadingModal.classList.add('is-blocking');
+        loadingModal.setAttribute('aria-hidden', 'false');
+      } else {
+        loadingModal.classList.remove('is-blocking');
+        loadingModal.setAttribute('aria-hidden', 'true');
+      }
+    }
+
     function setButtonsDisabled(disabled) {
       epilogueBtn.disabled = disabled;
-      epilogueBtn.textContent = disabled
-        ? `${stagedStepLabels[currentStage]}候補の作成及び選択`
+      if (disabled) {
+        epilogueBtn.textContent = `${stagedStepLabels[currentStage]}候補の作成及び選択`;
+        return;
+      }
+      epilogueBtn.textContent = flowCompleted
+        ? '最初から選び直す'
         : `${stagedStepLabels[currentStage]}候補の作成及び選択`;
     }
 
@@ -461,8 +509,11 @@
 
     async function fetchStageChoices(step) {
       currentStage = step;
+      flowCompleted = false;
       updateStageIntro(step);
       setButtonsDisabled(true);
+      setFieldsDisabled(true);
+      setLoadingModal(true, `${stagedStepLabels[step]} 候補を生成してる。いまは入力をロックしてる。`);
       output.textContent = `${stagedStepLabels[step]} 候補の返却待ち...`;
       setStatus(`<strong>送信済み</strong><br>${stagedStepLabels[step]} 候補を生成してる。`, 'busy');
 
@@ -495,12 +546,16 @@
           data = JSON.parse(raw);
         } catch (parseError) {
           setButtonsDisabled(false);
+          setFieldsDisabled(false);
+          setLoadingModal(false);
           setStatus(`<strong>エラー</strong><br>${stagedStepLabels[step]} 候補 API が JSON 以外を返した。HTTP ${res.status}`, 'error');
           output.textContent = `サーバエラー: HTTP ${res.status}\n\n${raw.slice(0, 1200)}`;
           return;
         }
         if (!res.ok) {
           setButtonsDisabled(false);
+          setFieldsDisabled(false);
+          setLoadingModal(false);
           setStatus(`<strong>エラー</strong><br>${stagedStepLabels[step]} 候補生成に失敗した。HTTP ${res.status}`, 'error');
           output.textContent = JSON.stringify({
             status: 'error',
@@ -510,11 +565,15 @@
           return;
         }
         setButtonsDisabled(false);
+        setFieldsDisabled(false);
+        setLoadingModal(false);
         setStatus(`<strong>候補生成完了</strong><br>${stagedStepLabels[step]} 候補を選んで確定して。`, 'success');
         output.textContent = JSON.stringify(data, null, 2);
         openEpilogueModal(data.choices || []);
       } catch (e) {
         setButtonsDisabled(false);
+        setFieldsDisabled(false);
+        setLoadingModal(false);
         setStatus(`<strong>通信エラー</strong><br>${stagedStepLabels[step]} 候補取得に失敗した。`, 'error');
         output.textContent = String(e);
       }
@@ -522,6 +581,8 @@
 
     async function finalizeStagedStory() {
       setButtonsDisabled(true);
+      setFieldsDisabled(true);
+      setLoadingModal(true, '最終 JSON を組み立ててる。いまは入力をロックしてる。');
       output.textContent = '確定済み段から最終 JSON を組み立ててる...';
       setStatus('<strong>最終組み立て中</strong><br>確定済みの各段から物語構造 JSON を完成させてる。', 'busy');
 
@@ -543,12 +604,16 @@
           data = JSON.parse(raw);
         } catch (parseError) {
           setButtonsDisabled(false);
+          setFieldsDisabled(false);
+          setLoadingModal(false);
           setStatus(`<strong>エラー</strong><br>最終組み立て API が JSON 以外を返した。HTTP ${res.status}`, 'error');
           output.textContent = `サーバエラー: HTTP ${res.status}\n\n${raw.slice(0, 1200)}`;
           return;
         }
         if (!res.ok) {
           setButtonsDisabled(false);
+          setFieldsDisabled(false);
+          setLoadingModal(false);
           setStatus(`<strong>エラー</strong><br>最終 JSON 組み立てに失敗した。HTTP ${res.status}`, 'error');
           output.textContent = JSON.stringify({
             status: 'error',
@@ -557,11 +622,17 @@
           }, null, 2);
           return;
         }
+        flowCompleted = true;
         setButtonsDisabled(false);
+        setFieldsDisabled(false);
+        setLoadingModal(false);
+        stageIntro.textContent = '物語構造の遡上が完了した。(最初からやり直す場合はボタンを押す)';
         setStatus('<strong>段階選択完了</strong><br>確定済みの段から最終 JSON を生成した。', 'success');
         output.textContent = JSON.stringify(data, null, 2);
       } catch (e) {
         setButtonsDisabled(false);
+        setFieldsDisabled(false);
+        setLoadingModal(false);
         setStatus('<strong>通信エラー</strong><br>最終 JSON の取得に失敗した。', 'error');
         output.textContent = String(e);
       }
@@ -569,6 +640,7 @@
 
     epilogueBtn.addEventListener('click', async () => {
       clearWaitingTimer();
+      flowCompleted = false;
       stagedStepOrder.forEach((step) => delete selectedPlot[step]);
       updateStageIntro('epilogue');
       renderSelectedPlot();
