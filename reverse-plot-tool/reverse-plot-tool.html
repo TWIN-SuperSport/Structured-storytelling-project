@@ -33,6 +33,24 @@
       font-size: clamp(2rem, 5vw, 3.4rem);
       letter-spacing: 0.04em;
     }
+    .title-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .version-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(143,77,46,0.16);
+      background: rgba(255,250,242,0.82);
+      color: var(--muted);
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.82rem;
+      letter-spacing: 0.03em;
+    }
     .lead {
       margin: 0 0 22px;
       color: var(--muted);
@@ -228,12 +246,16 @@
     @media (max-width: 800px) {
       .grid { grid-template-columns: 1fr; }
       .row { grid-template-columns: 1fr; }
+      .title-row { align-items: flex-start; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <h1>reverse-plot-tool</h1>
+    <div class="title-row">
+      <h1>reverse-plot-tool</h1>
+      <span id="version-badge" class="version-badge">version: ...</span>
+    </div>
     <p class="lead">結末や終着条件から、物語の前提・欠落・関係変化・転換点を遡上して構造化するための検証サービス。</p>
     <div class="grid">
       <section class="panel">
@@ -267,8 +289,8 @@
           <p class="hint">0 は堅実、10 は「転」で物語の見え方がひっくり返る級。ただし因果と結末整合は守る。</p>
         </div>
         <div class="actions">
-          <button id="run-btn" type="button">物語構造を遡上する</button>
-          <button id="epilogue-btn" class="secondary-btn" type="button">epilogue 候補を選ぶ</button>
+          <p id="stage-intro" class="hint">物語構造を遡上します。(epilogue を作成します)</p>
+          <button id="epilogue-btn" class="secondary-btn" type="button">epilogue候補の作成及び選択</button>
         </div>
       </section>
       <section class="panel">
@@ -276,7 +298,7 @@
         <div id="status-box" class="status">まだ送信してないよ。終着条件を整えたら、下の JSON 欄に結果が出る。</div>
         <section class="choice-card">
           <h2>確定した epilogue</h2>
-          <p id="selected-epilogue">まだ未選択。`epilogue 候補を選ぶ` から候補を出せる。</p>
+          <p id="selected-epilogue">まだ未選択。`epilogue候補の作成及び選択` から候補を出せる。</p>
         </section>
         <pre id="output">ここに結果が出る。</pre>
       </section>
@@ -285,7 +307,7 @@
   <div id="epilogue-modal" class="modal" aria-hidden="true">
     <div class="modal-panel">
       <div class="modal-head">
-        <strong>epilogue 候補を選ぶ</strong><br>
+        <strong>epilogue候補の作成及び選択</strong><br>
         <span class="hint">候補を1つ選んで確定すると、右側に保持される。</span>
       </div>
       <div id="epilogue-choices" class="modal-body"></div>
@@ -296,10 +318,11 @@
     </div>
   </div>
   <script>
-    const btn = document.getElementById('run-btn');
+    const stageIntro = document.getElementById('stage-intro');
     const epilogueBtn = document.getElementById('epilogue-btn');
     const output = document.getElementById('output');
     const statusBox = document.getElementById('status-box');
+    const versionBadge = document.getElementById('version-badge');
     const selectedEpilogue = document.getElementById('selected-epilogue');
     const epilogueModal = document.getElementById('epilogue-modal');
     const epilogueChoices = document.getElementById('epilogue-choices');
@@ -319,6 +342,25 @@
     const selectedPlot = {};
     let currentStage = 'epilogue';
 
+    function updateStageIntro(step) {
+      stageIntro.textContent = `物語構造を遡上します。(${stagedStepLabels[step]} を作成します)`;
+      epilogueBtn.textContent = `${stagedStepLabels[step]}候補の作成及び選択`;
+    }
+
+    async function loadVersion() {
+      try {
+        const res = await fetch('/api/health');
+        if (!res.ok) {
+          versionBadge.textContent = 'version: unknown';
+          return;
+        }
+        const data = await res.json();
+        versionBadge.textContent = `version: ${data.version || 'unknown'}`;
+      } catch (e) {
+        versionBadge.textContent = 'version: unknown';
+      }
+    }
+
     function setStatus(message, mode = '') {
       statusBox.className = `status${mode ? ` is-${mode}` : ''}`;
       statusBox.innerHTML = message;
@@ -332,10 +374,10 @@
     }
 
     function setButtonsDisabled(disabled) {
-      btn.disabled = disabled;
       epilogueBtn.disabled = disabled;
-      btn.textContent = disabled ? '生成待ち...' : '物語構造を遡上する';
-      epilogueBtn.textContent = disabled ? '候補生成待ち...' : '段階選択をはじめる';
+      epilogueBtn.textContent = disabled
+        ? `${stagedStepLabels[currentStage]}候補の作成及び選択`
+        : `${stagedStepLabels[currentStage]}候補の作成及び選択`;
     }
 
     function closeEpilogueModal() {
@@ -345,7 +387,7 @@
 
     function openEpilogueModal(choices) {
       currentEpilogueChoices = choices;
-      epilogueModal.querySelector('.modal-head strong').textContent = `${stagedStepLabels[currentStage]} 候補を選ぶ`;
+      epilogueModal.querySelector('.modal-head strong').textContent = `${stagedStepLabels[currentStage]}候補の作成及び選択`;
       epilogueModal.querySelector('.modal-head .hint').textContent = `${stagedStepLabels[currentStage]} 候補を1つ選んで確定すると、次の段へ進む。`;
       epilogueConfirmBtn.textContent = `${stagedStepLabels[currentStage]} を確定`;
       epilogueChoices.innerHTML = choices.map((choice, index) => `
@@ -385,11 +427,12 @@
 
       selectedEpilogue.textContent = lines.length
         ? lines.join('\n\n')
-        : 'まだ未選択。段階選択をはじめる から候補を出せる。';
+        : 'まだ未選択。epilogue候補の作成及び選択 から候補を出せる。';
     }
 
     async function fetchStageChoices(step) {
       currentStage = step;
+      updateStageIntro(step);
       setButtonsDisabled(true);
       output.textContent = `${stagedStepLabels[step]} 候補の返却待ち...`;
       setStatus(`<strong>送信済み</strong><br>${stagedStepLabels[step]} 候補を生成してる。`, 'busy');
@@ -495,63 +538,10 @@
       }
     }
 
-    btn.addEventListener('click', async () => {
-      clearWaitingTimer();
-      setButtonsDisabled(true);
-      output.textContent = 'JSON の返却待ち...';
-      startWaitingStatus();
-      try {
-        const res = await fetch('/api/story/reverse-plot', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ending_text: document.getElementById('ending_text').value,
-            genre_hint: document.getElementById('genre_hint').value,
-            protagonist_hint: document.getElementById('protagonist_hint').value,
-            wild_twist_level: Number(document.getElementById('wild_twist_level').value)
-          })
-        });
-        const raw = await res.text();
-        let data = null;
-        try {
-          data = JSON.parse(raw);
-        } catch (parseError) {
-          clearWaitingTimer();
-          setButtonsDisabled(false);
-          if (!res.ok) {
-            setStatus(`<strong>エラー</strong><br>サーバが JSON 以外を返した。HTTP ${res.status}`, 'error');
-            output.textContent = `サーバエラー: HTTP ${res.status}\n\n${raw.slice(0, 1200)}`;
-            return;
-          }
-          setStatus('<strong>エラー</strong><br>レスポンスの JSON 解析に失敗した。', 'error');
-          throw new Error(`JSON parse failed: ${parseError.message}\n\n${raw.slice(0, 400)}`);
-        }
-        if (!res.ok) {
-          clearWaitingTimer();
-          setButtonsDisabled(false);
-          setStatus(`<strong>エラー</strong><br>生成は完了しなかった。HTTP ${res.status} の応答を受け取った。`, 'error');
-          output.textContent = JSON.stringify({
-            status: 'error',
-            http_status: res.status,
-            body: data
-          }, null, 2);
-          return;
-        }
-        clearWaitingTimer();
-        setButtonsDisabled(false);
-        setStatus('<strong>生成完了</strong><br>JSON が返ってきた。内容を下で確認して。', 'success');
-        output.textContent = JSON.stringify(data, null, 2);
-      } catch (e) {
-        clearWaitingTimer();
-        setButtonsDisabled(false);
-        setStatus('<strong>通信エラー</strong><br>結果取得中に失敗した。下の内容をそのまま見れば切り分けできる。', 'error');
-        output.textContent = String(e);
-      }
-    });
-
     epilogueBtn.addEventListener('click', async () => {
       clearWaitingTimer();
       stagedStepOrder.forEach((step) => delete selectedPlot[step]);
+      updateStageIntro('epilogue');
       renderSelectedPlot();
       await fetchStageChoices('epilogue');
     });
@@ -591,7 +581,9 @@
       }
     });
 
+    updateStageIntro('epilogue');
     renderSelectedPlot();
+    loadVersion();
   </script>
 </body>
 </html>

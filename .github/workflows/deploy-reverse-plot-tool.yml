@@ -38,6 +38,7 @@ jobs:
             fi
             git reset --hard FETCH_HEAD
             cd reverse-plot-tool
+            printf "APP_VERSION=%s\n" "$(git -C .. rev-parse --short HEAD)" > .env
             docker compose down --remove-orphans || true
             docker compose up -d --build
           '

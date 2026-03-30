@@ -18,6 +18,7 @@ services:
       - LLM_MODEL=swallow
       - LLM_TIMEOUT=240
       - LLM_POLL_INTERVAL=2
+      - APP_VERSION=${APP_VERSION:-dev}
 
   nginx:
     image: nginx:1.28-alpine
