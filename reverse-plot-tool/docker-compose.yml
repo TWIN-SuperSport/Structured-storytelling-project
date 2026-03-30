@@ -16,7 +16,7 @@ services:
     environment:
       - LLM_BASE_URL=https://swallow-relay.wos.ktsys.jp
       - LLM_MODEL=swallow
-      - LLM_TIMEOUT=120
+      - LLM_TIMEOUT=240
 
   nginx:
     image: nginx:1.28-alpine

@@ -30,5 +30,6 @@ Structured-storytelling-project 配下で、結末から物語構造を遡上す
 
 - `reverse-plot-tool` は `https://swallow-relay.wos.ktsys.jp` を使う
 - モデル名は `swallow`
-- timeout は `120` 秒
+- timeout は `240` 秒
 - 単発の重いプロット生成を想定し、実測では約 52 秒で成功を確認した
+- 2〜3分級の重い生成がありうるため、API と nginx の待ち時間も `240` 秒に揃える

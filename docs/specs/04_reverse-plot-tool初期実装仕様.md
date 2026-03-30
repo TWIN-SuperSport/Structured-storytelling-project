@@ -18,6 +18,7 @@ JSON 正本と人間向けプロットを育てる親プロジェクト。
 その最初の deployable child service が `reverse-plot-tool`。
 現時点では、結末の自由文から物語構造 JSON と短いプロット骨格を返す最小版として実装している。
 現行運用では、単発で重いプロット生成に寄せるため、`Swallow-8B` 系の専用 relay を使う。
+また、重い生成で 2〜3 分かかるケースを見込み、`reverse-plot-tool` 側の待ち時間は `240` 秒で運用する。
 
 **設計方針**
 - 初期版は `reverse-plot-tool` を単機能の検証サービスとして切り出す
@@ -79,6 +80,9 @@ JSON 正本と人間向けプロットを育てる親プロジェクト。
 |---|---|---|---|
 | 逆算プロット生成 | `POST` | `/api/story/reverse-plot` | 終着条件から物語構造 JSON を生成 |
 | ヘルスチェック | `GET` | `/api/health` | ミドルウェア稼働確認 |
+
+補足:
+`POST /api/story/reverse-plot` は `Swallow` の重い生成を見込み、FastAPI の upstream timeout と nginx の proxy timeout をともに `240` 秒で運用する。
 
 ### POST /api/story/reverse-plot
 
@@ -261,3 +265,4 @@ JSON 正本と人間向けプロットを育てる親プロジェクト。
 |---|---|---|---|
 | 2026-03-29(日) 20:01 | cliあやの | `mirror-akinator` の `plan/01_仕様書.md` を参考に初版作成 | `reverse-plot-tool` の現在実装と上流仕様との差分を一枚で確認できるようにするため |
 | 2026-03-29(日) 22:06 | cliあやの | `Swallow-8B` 専用 relay を使う試験運用の前提を追記 | 単発プロット生成を品質優先で運用している現状を仕様に反映するため |
+| 2026-03-30 | cliあやの | `Swallow` 専用 relay と `240` 秒 timeout 運用を明記 | 2〜3分級の重い生成で手前の timeout が先に刺さらないようにするため |

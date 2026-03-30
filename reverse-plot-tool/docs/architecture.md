@@ -4,7 +4,7 @@ Browser
  -> nginx
  -> Slim PHP
  -> FastAPI
- -> llm-relay
- -> Win10PC Qwen
+ -> swallow-relay.wos.ktsys.jp
+ -> Win10PC Swallow-8B (:8080)
 
 正本は FastAPI が返す story JSON。
