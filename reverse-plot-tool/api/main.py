@@ -7,6 +7,7 @@ import asyncio
 
 app = FastAPI()
 PLOT_STEP_ORDER = ["epilogue", "ten", "sho", "ki", "prologue"]
+APP_VERSION = os.getenv("APP_VERSION", "dev")
 
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "https://swallow-relay.wos.ktsys.jp")
 LLM_MODEL = os.getenv("LLM_MODEL", "swallow")
@@ -526,4 +527,4 @@ async def reverse_plot_staged_finalize(req: FinalizeRequest):
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": APP_VERSION}

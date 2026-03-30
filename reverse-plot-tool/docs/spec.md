@@ -54,6 +54,12 @@
   - 90 秒以降: `かなり長考中だが、そのまま待機してよい`
 - 待機中は送信ボタンを無効化し、二重送信を防ぐ
 
+## バージョン表示
+
+- 画面タイトル横に `version: <short-sha>` を表示する
+- 表示値は `/api/health` の `version` から取得する
+- deploy workflow は `main` に反映された commit の short SHA を `APP_VERSION` として渡す
+
 ## UI エラー表示
 
 - HTTP エラー時は、単なる失敗表示ではなく `HTTP status` と応答本文を確認できる形で出す
