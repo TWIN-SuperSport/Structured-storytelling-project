@@ -640,11 +640,14 @@
 
     epilogueBtn.addEventListener('click', async () => {
       clearWaitingTimer();
-      flowCompleted = false;
-      stagedStepOrder.forEach((step) => delete selectedPlot[step]);
-      updateStageIntro('epilogue');
-      renderSelectedPlot();
-      await fetchStageChoices('epilogue');
+      if (flowCompleted) {
+        flowCompleted = false;
+        currentStage = 'epilogue';
+        stagedStepOrder.forEach((step) => delete selectedPlot[step]);
+        updateStageIntro('epilogue');
+        renderSelectedPlot();
+      }
+      await fetchStageChoices(currentStage);
     });
 
     epilogueConfirmBtn.addEventListener('click', () => {
@@ -658,14 +661,17 @@
         setStatus('<strong>エラー</strong><br>選択候補を解決できなかった。', 'error');
         return;
       }
+      const confirmedStep = currentStage;
       selectedPlot[currentStage] = picked.text;
       renderSelectedPlot();
       closeEpilogueModal();
       const nextIndex = stagedStepOrder.indexOf(currentStage) + 1;
       const nextStep = stagedStepOrder[nextIndex];
       if (nextStep) {
-        setStatus(`<strong>${stagedStepLabels[currentStage]} 確定</strong><br>次は ${stagedStepLabels[nextStep]} 候補を生成する。`, 'success');
-        fetchStageChoices(nextStep);
+        currentStage = nextStep;
+        updateStageIntro(nextStep);
+        setButtonsDisabled(false);
+        setStatus(`<strong>${stagedStepLabels[confirmedStep]} 確定</strong><br>次は ${stagedStepLabels[nextStep]}。ボタンを押すと候補を作成する。`, 'success');
         return;
       }
       setStatus('<strong>plot 確定完了</strong><br>5段すべてを選んだ。最終 JSON を組み立てる。', 'success');
@@ -674,6 +680,10 @@
 
     epilogueCancelBtn.addEventListener('click', () => {
       closeEpilogueModal();
+      setButtonsDisabled(false);
+      setFieldsDisabled(false);
+      setLoadingModal(false);
+      setStatus(`<strong>候補表示を閉じた</strong><br>${stagedStepLabels[currentStage]} はまだ未確定。続ける時は同じボタンを押して。`, 'success');
     });
 
     epilogueModal.addEventListener('click', (event) => {
