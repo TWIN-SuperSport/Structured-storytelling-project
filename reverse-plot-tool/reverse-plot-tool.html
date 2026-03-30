@@ -132,6 +132,90 @@
       background: rgba(110,136,96,0.12);
       color: #35502f;
     }
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .secondary-btn {
+      background: #efe0cc;
+      color: var(--accent);
+      border: 1px solid rgba(143,77,46,0.18);
+    }
+    .choice-card {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,0.72);
+    }
+    .choice-card h2 {
+      margin: 0 0 8px;
+      font-size: 1rem;
+    }
+    .choice-card p {
+      margin: 0;
+      line-height: 1.8;
+      color: var(--ink);
+    }
+    .modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      background: rgba(22, 17, 12, 0.48);
+      z-index: 20;
+    }
+    .modal.is-open {
+      display: flex;
+    }
+    .modal-panel {
+      width: min(760px, 100%);
+      max-height: min(78vh, 760px);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border-radius: 18px;
+      background: var(--paper);
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 40px rgba(35, 23, 12, 0.24);
+    }
+    .modal-head, .modal-foot {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+    .modal-foot {
+      border-top: 1px solid var(--line);
+      border-bottom: none;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+    .modal-body {
+      padding: 14px 18px 18px;
+      overflow: auto;
+    }
+    .choice-option {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(216,200,177,0.72);
+    }
+    .choice-option:last-child {
+      border-bottom: none;
+    }
+    .choice-option input {
+      width: auto;
+      margin-top: 4px;
+    }
+    .choice-option-text {
+      line-height: 1.8;
+      white-space: pre-wrap;
+    }
     select {
       width: 100%;
       border: 1px solid var(--line);
@@ -182,21 +266,48 @@
           </select>
           <p class="hint">0 は堅実、10 は「転」で物語の見え方がひっくり返る級。ただし因果と結末整合は守る。</p>
         </div>
-        <button id="run-btn" type="button">物語構造を遡上する</button>
+        <div class="actions">
+          <button id="run-btn" type="button">物語構造を遡上する</button>
+          <button id="epilogue-btn" class="secondary-btn" type="button">epilogue 候補を選ぶ</button>
+        </div>
       </section>
       <section class="panel">
         <p class="hint">いまは JSON をそのまま表示する。最終的にはこの正本から `.md` のプロットを起こす想定。</p>
         <div id="status-box" class="status">まだ送信してないよ。終着条件を整えたら、下の JSON 欄に結果が出る。</div>
+        <section class="choice-card">
+          <h2>確定した epilogue</h2>
+          <p id="selected-epilogue">まだ未選択。`epilogue 候補を選ぶ` から候補を出せる。</p>
+        </section>
         <pre id="output">ここに結果が出る。</pre>
       </section>
     </div>
   </div>
+  <div id="epilogue-modal" class="modal" aria-hidden="true">
+    <div class="modal-panel">
+      <div class="modal-head">
+        <strong>epilogue 候補を選ぶ</strong><br>
+        <span class="hint">候補を1つ選んで確定すると、右側に保持される。</span>
+      </div>
+      <div id="epilogue-choices" class="modal-body"></div>
+      <div class="modal-foot">
+        <button id="epilogue-cancel-btn" class="secondary-btn" type="button">閉じる</button>
+        <button id="epilogue-confirm-btn" type="button">この候補で確定</button>
+      </div>
+    </div>
+  </div>
   <script>
     const btn = document.getElementById('run-btn');
+    const epilogueBtn = document.getElementById('epilogue-btn');
     const output = document.getElementById('output');
     const statusBox = document.getElementById('status-box');
+    const selectedEpilogue = document.getElementById('selected-epilogue');
+    const epilogueModal = document.getElementById('epilogue-modal');
+    const epilogueChoices = document.getElementById('epilogue-choices');
+    const epilogueConfirmBtn = document.getElementById('epilogue-confirm-btn');
+    const epilogueCancelBtn = document.getElementById('epilogue-cancel-btn');
 
     let waitingTimer = null;
+    let currentEpilogueChoices = [];
 
     function setStatus(message, mode = '') {
       statusBox.className = `status${mode ? ` is-${mode}` : ''}`;
@@ -208,6 +319,30 @@
         clearInterval(waitingTimer);
         waitingTimer = null;
       }
+    }
+
+    function setButtonsDisabled(disabled) {
+      btn.disabled = disabled;
+      epilogueBtn.disabled = disabled;
+      btn.textContent = disabled ? '生成待ち...' : '物語構造を遡上する';
+      epilogueBtn.textContent = disabled ? '候補生成待ち...' : 'epilogue 候補を選ぶ';
+    }
+
+    function closeEpilogueModal() {
+      epilogueModal.classList.remove('is-open');
+      epilogueModal.setAttribute('aria-hidden', 'true');
+    }
+
+    function openEpilogueModal(choices) {
+      currentEpilogueChoices = choices;
+      epilogueChoices.innerHTML = choices.map((choice, index) => `
+        <label class="choice-option">
+          <input type="radio" name="epilogue-choice" value="${choice.id}" ${index === 0 ? 'checked' : ''}>
+          <span class="choice-option-text">${choice.text}</span>
+        </label>
+      `).join('');
+      epilogueModal.classList.add('is-open');
+      epilogueModal.setAttribute('aria-hidden', 'false');
     }
 
     function startWaitingStatus() {
@@ -232,8 +367,7 @@
 
     btn.addEventListener('click', async () => {
       clearWaitingTimer();
-      btn.disabled = true;
-      btn.textContent = '生成待ち...';
+      setButtonsDisabled(true);
       output.textContent = 'JSON の返却待ち...';
       startWaitingStatus();
       try {
@@ -253,8 +387,7 @@
           data = JSON.parse(raw);
         } catch (parseError) {
           clearWaitingTimer();
-          btn.disabled = false;
-          btn.textContent = '物語構造を遡上する';
+          setButtonsDisabled(false);
           if (!res.ok) {
             setStatus(`<strong>エラー</strong><br>サーバが JSON 以外を返した。HTTP ${res.status}`, 'error');
             output.textContent = `サーバエラー: HTTP ${res.status}\n\n${raw.slice(0, 1200)}`;
@@ -265,8 +398,7 @@
         }
         if (!res.ok) {
           clearWaitingTimer();
-          btn.disabled = false;
-          btn.textContent = '物語構造を遡上する';
+          setButtonsDisabled(false);
           setStatus(`<strong>エラー</strong><br>生成は完了しなかった。HTTP ${res.status} の応答を受け取った。`, 'error');
           output.textContent = JSON.stringify({
             status: 'error',
@@ -276,16 +408,88 @@
           return;
         }
         clearWaitingTimer();
-        btn.disabled = false;
-        btn.textContent = '物語構造を遡上する';
+        setButtonsDisabled(false);
         setStatus('<strong>生成完了</strong><br>JSON が返ってきた。内容を下で確認して。', 'success');
         output.textContent = JSON.stringify(data, null, 2);
       } catch (e) {
         clearWaitingTimer();
-        btn.disabled = false;
-        btn.textContent = '物語構造を遡上する';
+        setButtonsDisabled(false);
         setStatus('<strong>通信エラー</strong><br>結果取得中に失敗した。下の内容をそのまま見れば切り分けできる。', 'error');
         output.textContent = String(e);
+      }
+    });
+
+    epilogueBtn.addEventListener('click', async () => {
+      clearWaitingTimer();
+      setButtonsDisabled(true);
+      output.textContent = 'epilogue 候補の返却待ち...';
+      setStatus('<strong>送信済み</strong><br>epilogue 候補をまとめて生成してる。', 'busy');
+      try {
+        const res = await fetch('/api/story/reverse-plot/staged/epilogue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ending_text: document.getElementById('ending_text').value,
+            genre_hint: document.getElementById('genre_hint').value,
+            protagonist_hint: document.getElementById('protagonist_hint').value,
+            wild_twist_level: Number(document.getElementById('wild_twist_level').value),
+            choice_count: 3
+          })
+        });
+        const raw = await res.text();
+        let data = null;
+        try {
+          data = JSON.parse(raw);
+        } catch (parseError) {
+          setButtonsDisabled(false);
+          setStatus(`<strong>エラー</strong><br>候補 API が JSON 以外を返した。HTTP ${res.status}`, 'error');
+          output.textContent = `サーバエラー: HTTP ${res.status}\n\n${raw.slice(0, 1200)}`;
+          return;
+        }
+        if (!res.ok) {
+          setButtonsDisabled(false);
+          setStatus(`<strong>エラー</strong><br>epilogue 候補生成に失敗した。HTTP ${res.status}`, 'error');
+          output.textContent = JSON.stringify({
+            status: 'error',
+            http_status: res.status,
+            body: data
+          }, null, 2);
+          return;
+        }
+        setButtonsDisabled(false);
+        setStatus('<strong>候補生成完了</strong><br>epilogue 候補を選んで確定して。', 'success');
+        output.textContent = JSON.stringify(data, null, 2);
+        openEpilogueModal(data.choices || []);
+      } catch (e) {
+        setButtonsDisabled(false);
+        setStatus('<strong>通信エラー</strong><br>epilogue 候補取得に失敗した。', 'error');
+        output.textContent = String(e);
+      }
+    });
+
+    epilogueConfirmBtn.addEventListener('click', () => {
+      const checked = document.querySelector('input[name="epilogue-choice"]:checked');
+      if (!checked) {
+        setStatus('<strong>未選択</strong><br>確定する候補を1つ選んで。', 'error');
+        return;
+      }
+      const picked = currentEpilogueChoices.find((item) => item.id === checked.value);
+      if (!picked) {
+        setStatus('<strong>エラー</strong><br>選択候補を解決できなかった。', 'error');
+        return;
+      }
+      selectedEpilogue.textContent = picked.text;
+      closeEpilogueModal();
+      setStatus('<strong>epilogue 確定</strong><br>最初の段として epilogue を保持した。次は ten へ進む設計。', 'success');
+    });
+
+    epilogueCancelBtn.addEventListener('click', () => {
+      closeEpilogueModal();
+    });
+
+    epilogueModal.addEventListener('click', (event) => {
+      if (event.target === epilogueModal) {
+        closeEpilogueModal();
       }
     });
   </script>
