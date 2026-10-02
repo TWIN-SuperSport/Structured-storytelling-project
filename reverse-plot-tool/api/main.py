@@ -193,6 +193,7 @@ class FinalizeRequest(BaseModel):
 async def submit_llm_job(client: httpx.AsyncClient, messages: list[dict], max_tokens: int) -> str:
     res = await client.post(
         f"{LLM_BASE_URL}/v1/jobs/chat/completions",
+        headers={"X-Relay-Client": "reverse-plot-tool"},
         json={
             "model": LLM_MODEL,
             "messages": messages,

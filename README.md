@@ -1,3 +1,5 @@
+Current deployment: BASE LAN-only; see docs/BASE_RECOVERY_20261002.md. Legacy VPS procedures are obsolete.
+
 # Structured-storytelling-project
 
 Through conceptual storytelling, the plot and characters are created by working backward from the story's ending to establish the underlying premises.
